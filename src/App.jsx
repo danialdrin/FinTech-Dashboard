@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { addTransaction, completeTransaction, toggleRole as toggleRoleAction, login, logout, setSearchQuery as setSearchQueryAction, setFilterStatus as setFilterStatusAction, addNotification, hideToast, markNotificationsRead } from './store/financeSlice';
 import {
   LayoutDashboard,
   Receipt,
@@ -55,15 +57,15 @@ const spendingData = [
   { name: 'Misc', value: 15, color: '#8a4cfc', amount: '₹18,750' },
 ];
 
-const allTransactions = [
-  { id: 1, name: 'Apple Store', date: 'Oct 24, 2023', amount: '₹1,499', status: 'Completed', type: 'debit', category: 'Technology', icon: '📱' },
-  { id: 2, name: 'Stripe Payout', date: 'Oct 23, 2023', amount: '₹12,500', status: 'Completed', type: 'credit', category: 'Income', icon: '💰' },
-  { id: 3, name: 'Uber Technologies', date: 'Oct 22, 2023', amount: '₹450', status: 'Pending', type: 'debit', category: 'Transport', icon: '🚗' },
-  { id: 4, name: 'Rent Payment', date: 'Oct 01, 2023', amount: '₹25,000', status: 'Completed', type: 'debit', category: 'Housing', icon: '🏠' },
-  { id: 5, name: 'Google Cloud', date: 'Sep 28, 2023', amount: '₹8,200', status: 'Completed', type: 'debit', category: 'Work', icon: '☁️' },
-  { id: 6, name: 'Amazon Shopping', date: 'Sep 25, 2023', amount: '₹3,400', status: 'Completed', type: 'debit', category: 'Shopping', icon: '📦' },
-  { id: 7, name: 'Starbucks Coffee', date: 'Sep 24, 2023', amount: '₹350', status: 'Failed', type: 'debit', category: 'Food', icon: '☕' },
-  { id: 8, name: 'Freelance Design', date: 'Sep 20, 2023', amount: '₹18,000', status: 'Completed', type: 'credit', category: 'Income', icon: '🎨' },
+const initialTransactions = [
+  { id: 1, name: 'Apple Store', date: 'Oct 24, 2023', amount: '1,499', status: 'Completed', type: 'debit', category: 'Technology', icon: '📱' },
+  { id: 2, name: 'Stripe Payout', date: 'Oct 23, 2023', amount: '12,500', status: 'Completed', type: 'credit', category: 'Income', icon: '💰' },
+  { id: 3, name: 'Uber Technologies', date: 'Oct 22, 2023', amount: '450', status: 'Pending', type: 'debit', category: 'Transport', icon: '🚗' },
+  { id: 4, name: 'Rent Payment', date: 'Oct 01, 2023', amount: '25,000', status: 'Completed', type: 'debit', category: 'Housing', icon: '🏠' },
+  { id: 5, name: 'Google Cloud', date: 'Sep 28, 2023', amount: '8,200', status: 'Completed', type: 'debit', category: 'Work', icon: '☁️' },
+  { id: 6, name: 'Amazon Shopping', date: 'Sep 25, 2023', amount: '3,400', status: 'Completed', type: 'debit', category: 'Shopping', icon: '📦' },
+  { id: 7, name: 'Starbucks Coffee', date: 'Sep 24, 2023', amount: '350', status: 'Failed', type: 'debit', category: 'Food', icon: '☕' },
+  { id: 8, name: 'Freelance Design', date: 'Sep 20, 2023', amount: '18,000', status: 'Completed', type: 'credit', category: 'Income', icon: '🎨' },
 ];
 
 const insightsData = [
@@ -91,7 +93,7 @@ const goals = [
 
 // --- Sub-components (Views) ---
 
-const DashboardView = ({ onAction }) => (
+const DashboardView = ({ onAction, userRole }) => (
   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="page-content">
     <section className="stats-grid">
       <div className="stat-card fade-in">
@@ -111,18 +113,25 @@ const DashboardView = ({ onAction }) => (
       </div>
     </section>
 
-    <section className="quick-actions fade-in fade-in-delay-3">
-      {['send', 'add', 'cards', 'plan'].map(type => (
+    <section className="quick-actions fade-in fade-in-delay-3" style={{ gridTemplateColumns: userRole === 'admin' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
+      {['send', 'cards', 'plan'].map(type => (
         <button key={type} className="action-btn" onClick={() => onAction(type)}>
           <div className="action-icon">
             {type === 'send' && <Send size={24} />}
-            {type === 'add' && <Plus size={24} />}
             {type === 'cards' && <CreditCard size={24} />}
             {type === 'plan' && <PieChart size={24} />}
           </div>
           <span className="action-label">{type}</span>
         </button>
       ))}
+      {userRole === 'admin' && (
+        <button className="action-btn" onClick={() => onAction('add')}>
+          <div className="action-icon">
+            <Plus size={24} />
+          </div>
+          <span className="action-label">Add (Admin)</span>
+        </button>
+      )}
     </section>
 
     <div className="content-grid">
@@ -173,74 +182,116 @@ const DashboardView = ({ onAction }) => (
   </motion.div>
 );
 
-const TransactionsView = () => (
-  <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="page-content">
-    <div className="section-header">
-      <div>
-        <h3 className="section-title">Ledger of Operations</h3>
-        <p className="section-subtitle">A granular record of your economic movement</p>
-      </div>
-      <div style={{ display: 'flex', gap: '0.75rem' }}>
-        <button className="topbar-btn"><Download size={18} /></button>
-        <button className="topbar-btn"><Filter size={18} /></button>
-      </div>
-    </div>
+const TransactionsView = ({ transactions, searchQuery, setSearchQuery, filterStatus, setFilterStatus }) => {
+  // Filtering and Sorting
+  const filteredTransactions = transactions.filter(txn => {
+    const matchesSearch = txn.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          txn.category.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === 'All' ? true : txn.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div className="transaction-list">
-        {/* Header Row */}
-        <div className="txn-item" style={{
-          background: 'var(--surface-container-low)',
-          padding: '1rem var(--spacing-6)',
-          cursor: 'default',
-          borderRadius: 0,
-          borderBottom: '1px solid var(--surface-container-high)',
-          display: 'flex',
-          alignItems: 'center'
-        }}>
-          <div style={{ width: 42 }}></div>
-          <div style={{ flex: 1, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)', marginLeft: '1rem' }}>Merchant/Transfer</div>
-          <div style={{ width: 140, textAlign: 'center', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Category</div>
-          <div style={{ width: 120, textAlign: 'center', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Status</div>
-          <div style={{ width: 100, textAlign: 'right', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Amount</div>
+  return (
+    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="page-content">
+      <div className="section-header" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '1.5rem', marginBottom: '2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h3 className="section-title">Transactions</h3>
+            <p className="section-subtitle">A detailed history of your payments</p>
+          </div>
+          <button className="btn-ghost" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Download size={18} /> Export
+          </button>
         </div>
+        
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', justifyContent: 'space-between', background: 'var(--surface-container-low)', padding: '0.75rem', borderRadius: 'var(--radius-xl)' }}>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            {['All', 'Completed', 'Pending', 'Failed'].map(status => (
+              <button 
+                key={status}
+                onClick={() => setFilterStatus(status)}
+                className={`filter-pill ${filterStatus === status ? 'active' : ''}`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
 
-        {/* Data Rows */}
-        {allTransactions.map((txn) => (
-          <div key={txn.id} className="txn-item" style={{
-            padding: '1.25rem var(--spacing-6)',
-            borderBottom: '1px solid var(--surface-container)',
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: 'var(--outline)' }} />
+            <input 
+              type="text" 
+              placeholder="Search merchants or categories..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="transaction-list">
+          {/* Header Row */}
+          <div className="txn-item" style={{
+            background: 'var(--surface-container-low)',
+            padding: '1rem var(--spacing-6)',
+            cursor: 'default',
             borderRadius: 0,
-            margin: 0,
+            borderBottom: '1px solid var(--surface-container-high)',
             display: 'flex',
             alignItems: 'center'
           }}>
-            <div className="txn-icon" style={{
-              backgroundColor: txn.type === 'credit' ? '#7ffc97' : '#e2dfff'
-            }}>
-              {txn.icon}
-            </div>
-            <div style={{ flex: 1, marginLeft: '1rem', minWidth: 0 }}>
-              <div className="txn-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{txn.name}</div>
-              <div className="txn-date">{txn.date}</div>
-            </div>
-            <div style={{ width: 140, display: 'flex', justifyContent: 'center' }}>
-              <span className="category-pill">{txn.category}</span>
-            </div>
-            <div style={{ width: 120, display: 'flex', justifyContent: 'center' }}>
-              <span className={`status-pill ${txn.status.toLowerCase()}`}>
-                {txn.status}
-              </span>
-            </div>
-            <div className={`txn-amount ${txn.type}`} style={{ width: 100, textAlign: 'right' }}>
-              {txn.type === 'credit' ? `+${txn.amount}` : `-${txn.amount}`}
-            </div>
+            <div style={{ width: 42 }}></div>
+            <div style={{ flex: 1, fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)', marginLeft: '1rem' }}>Merchant/Transfer</div>
+            <div style={{ width: 140, textAlign: 'center', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Category</div>
+            <div style={{ width: 120, textAlign: 'center', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Status</div>
+            <div style={{ width: 100, textAlign: 'right', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Amount</div>
           </div>
-        ))}
+
+          {/* Data Rows */}
+          {filteredTransactions.length === 0 ? (
+            <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--on-surface-variant)' }}>
+              No transactions found.
+            </div>
+          ) : (
+            filteredTransactions.map((txn) => (
+              <div key={txn.id} className="txn-item" style={{
+                padding: '1.25rem var(--spacing-6)',
+                borderBottom: '1px solid var(--surface-container)',
+                borderRadius: 0,
+                margin: 0,
+                display: 'flex',
+                alignItems: 'center'
+              }}>
+                <div className="txn-icon" style={{
+                  backgroundColor: txn.type === 'credit' ? '#7ffc97' : '#e2dfff'
+                }}>
+                  {txn.icon}
+                </div>
+                <div style={{ flex: 1, marginLeft: '1rem', minWidth: 0 }}>
+                  <div className="txn-name" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{txn.name}</div>
+                  <div className="txn-date">{txn.date}</div>
+                </div>
+                <div style={{ width: 140, display: 'flex', justifyContent: 'center' }}>
+                  <span className="category-pill">{txn.category}</span>
+                </div>
+                <div style={{ width: 120, display: 'flex', justifyContent: 'center' }}>
+                  <span className={`status-pill ${txn.status.toLowerCase()}`}>
+                    {txn.status}
+                  </span>
+                </div>
+                <div className={`txn-amount ${txn.type}`} style={{ width: 100, textAlign: 'right' }}>
+                  {txn.type === 'credit' ? `+₹${txn.amount}` : `-₹${txn.amount}`}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
-    </div>
-  </motion.div>
-);
+    </motion.div>
+  );
+};
 
 const InsightsView = () => (
   <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="page-content">
@@ -298,17 +349,88 @@ const InsightsView = () => (
   </motion.div>
 );
 
+const LoginView = ({ onLogin }) => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', background: 'var(--background)' }}>
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="card" style={{ width: '100%', maxWidth: 400, textAlign: 'center', padding: 'var(--spacing-10)' }}>
+      <div style={{ marginBottom: '2.5rem' }}>
+        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)', letterSpacing: '-0.03em' }}>Financial Atelier</h1>
+        <p style={{ color: 'var(--on-surface-variant)', fontSize: '0.875rem', marginTop: '0.5rem' }}>Please select your role</p>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        <button className="btn-primary" style={{ width: '100%', padding: '1rem' }} onClick={() => onLogin('admin')}>
+          Login as Admin
+        </button>
+        <button className="btn-ghost" style={{ width: '100%', padding: '1rem', border: '1px solid var(--outline-variant)' }} onClick={() => onLogin('viewer')}>
+          Login as Viewer
+        </button>
+      </div>
+    </motion.div>
+  </div>
+);
+
 // --- Main Application ---
 
 function App() {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [modalType, setModalType] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
+  
+  // Application State - Managed by Redux
+  const dispatch = useDispatch();
+  const [showNotifications, setShowNotifications] = useState(false);
+  const isAuthenticated = useSelector(state => state.finance.isAuthenticated);
+  const transactions = useSelector(state => state.finance.transactions);
+  const userRole = useSelector(state => state.finance.userRole);
+  const searchQuery = useSelector(state => state.finance.searchQuery);
+  const filterStatus = useSelector(state => state.finance.filterStatus);
+  const activeToast = useSelector(state => state.finance.activeToast);
+  const notifications = useSelector(state => state.finance.notifications);
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setShowNotifications(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [notifRef]);
+
+  useEffect(() => {
+    if (activeToast) {
+      // Manage the lifespan of the active visual popup toast
+      const timer = setTimeout(() => {
+        dispatch(hideToast());
+      }, 5000); 
+      return () => clearTimeout(timer);
+    }
+  }, [activeToast, dispatch]);
+
+  const handleAction = (type) => {
+    if (type === 'add' && userRole !== 'admin') {
+      alert('Access Denied: Only Admin can add transactions.');
+      return;
+    }
+    setModalType(type);
+  };
 
   const closeModal = () => {
     setModalType(null);
     setSelectedContact(null);
   };
+
+  const toggleRole = () => {
+    dispatch(toggleRoleAction());
+  };
+
+  if (!isAuthenticated) {
+    return <LoginView onLogin={(role) => dispatch(login(role))} />;
+  }
 
   return (
     <div className="app-layout">
@@ -337,11 +459,13 @@ function App() {
         </nav>
 
         <div className="sidebar-footer">
-          <div className="user-card">
-            <div className="user-avatar">JD</div>
+          <div className="user-card" onClick={() => dispatch(logout())} title="Click to logout">
+            <div className="user-avatar" style={{ background: userRole === 'admin' ? 'linear-gradient(135deg, #ba1a1a, #ffdad6)' : undefined, color: userRole === 'admin' ? '#fff' : undefined }}>JD</div>
             <div className="user-info">
-              <div className="user-name">Jane Doe</div>
-              <div className="user-role">Premium Member</div>
+              <div className="user-name">Jane Doe ({userRole})</div>
+              <div className="user-role" style={{ color: 'var(--error)', fontWeight: 600 }}>
+                Logout
+              </div>
             </div>
           </div>
         </div>
@@ -355,16 +479,84 @@ function App() {
             <p className="topbar-subtitle">Real-time status for your portfolio</p>
           </div>
           <div className="topbar-actions">
-            <div className="topbar-btn"><Search size={20} /></div>
-            <div className="topbar-btn">
-              <Bell size={20} /><span className="notif-dot"></span>
+            <div className="topbar-btn" ref={notifRef} style={{ position: 'relative' }} onClick={() => {
+              if (!showNotifications && unreadCount > 0) dispatch(markNotificationsRead());
+              setShowNotifications(!showNotifications);
+            }}>
+              <Bell size={20} className={activeToast ? 'icon-shake' : ''} />
+              {unreadCount > 0 && <span style={{ position: 'absolute', top: -4, right: -4, background: 'var(--error)', color: '#fff', fontSize: '0.65rem', fontWeight: 'bold', minWidth: 16, height: 16, padding: '0 4px', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount}</span>}
+              
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div 
+                    initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ position: 'absolute', top: '120%', right: 0, width: 320, background: 'var(--surface-container-lowest)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-card)', border: '1px solid var(--outline-variant)', overflow: 'hidden', zIndex: 50, textAlign: 'left', cursor: 'default' }}
+                  >
+                    <div style={{ padding: '1rem', borderBottom: '1px solid var(--outline-variant)', fontWeight: 600, color: 'var(--on-surface)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Recent Notifications</span>
+                      <button onClick={() => setShowNotifications(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--outline)' }}>
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div style={{ maxHeight: 300, overflowY: 'auto' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--on-surface-variant)', fontSize: '0.875rem' }}>No notifications yet.</div>
+                      ) : (
+                        notifications.map((notif, idx) => (
+                          <div key={idx} style={{ padding: '1rem', borderBottom: '1px solid var(--outline-variant)', display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                            <div style={{ background: 'var(--tertiary-fixed)', color: 'var(--on-tertiary-fixed-variant)', padding: 6, borderRadius: 'var(--radius-full)' }}><Receipt size={16} /></div>
+                            <div>
+                              <div style={{ fontWeight: 600, color: 'var(--on-surface)', fontSize: '0.875rem' }}>{notif.title}</div>
+                              <div style={{ color: 'var(--on-surface-variant)', fontSize: '0.75rem', marginTop: 2 }}>{notif.message}</div>
+                              <div style={{ color: 'var(--outline)', fontSize: '0.65rem', marginTop: 4 }}>{notif.time}</div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+
+                {activeToast && !showNotifications && (
+                  <motion.div 
+                    key={activeToast.id}
+                    initial={{ opacity: 0, scale: 0.8, y: -10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, y: -10 }}
+                    onClick={(e) => { e.stopPropagation(); setShowNotifications(true); }}
+                    style={{ position: 'absolute', top: '130%', right: 0, width: 340, background: 'var(--surface-container-lowest)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-hover)', borderLeft: '4px solid var(--tertiary)', overflow: 'hidden', zIndex: 100, textAlign: 'left', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '1rem' }}
+                  >
+                    <div style={{ background: 'var(--tertiary-fixed)', color: 'var(--on-tertiary-fixed-variant)', padding: 8, borderRadius: 'var(--radius-full)' }}>
+                      <Receipt size={20} />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--on-surface)', fontSize: '0.875rem' }}>{activeToast.title}</div>
+                      <div style={{ color: 'var(--on-surface-variant)', fontSize: '0.75rem' }}>{activeToast.message}</div>
+                    </div>
+                    <button onClick={(e) => { e.stopPropagation(); dispatch(hideToast()); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--outline)' }}>
+                      <X size={16} />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {activeTab === 'Dashboard' && <DashboardView onAction={(type) => setModalType(type)} />}
-          {activeTab === 'Transactions' && <TransactionsView />}
+          {activeTab === 'Dashboard' && <DashboardView onAction={handleAction} userRole={userRole} />}
+          {activeTab === 'Transactions' && (
+            <TransactionsView 
+              transactions={transactions}
+              searchQuery={searchQuery}
+              setSearchQuery={(q) => dispatch(setSearchQueryAction(q))}
+              filterStatus={filterStatus}
+              setFilterStatus={(s) => dispatch(setFilterStatusAction(s))}
+            />
+          )}
           {activeTab === 'Insights' && <InsightsView />}
         </div>
       </main>
@@ -410,28 +602,70 @@ function App() {
                 )}
 
                 {modalType === 'add' && (
-                  <>
+                  <form onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const parsedAmount = formData.get('amount').replace(/[^0-9.-]+/g,"");
+                    const generatedId = Date.now();
+                    const newTxn = {
+                      id: generatedId,
+                      name: formData.get('name'),
+                      amount: parsedAmount,
+                      date: formData.get('date'),
+                      category: formData.get('category'),
+                    };
+                    
+                    // Initially dispatch as pending
+                    dispatch(addTransaction(newTxn));
+                    closeModal();
+
+                    // Simulate delay and then complete it
+                    setTimeout(() => {
+                      dispatch(completeTransaction(generatedId));
+                      dispatch(addNotification({
+                        title: 'Transaction Processed',
+                        message: `Payment of ₹${parsedAmount} for ${newTxn.name} has been completed.`
+                      }));
+                    }, 3500);
+                  }}>
                     <div className="input-container">
                       <label className="input-label">Transaction Name</label>
                       <div style={{ position: 'relative' }}>
                         <Tag size={16} style={{ position: 'absolute', left: 12, top: 16, color: '#464555' }} />
-                        <input type="text" className="premium-input" style={{ paddingLeft: 40 }} placeholder="e.g. Grocery Shop" />
+                        <input name="name" required type="text" className="premium-input" style={{ paddingLeft: 40 }} placeholder="e.g. Grocery Shop" />
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div className="input-container">
-                        <label className="input-label">Amount</label>
-                        <input type="text" className="premium-input" placeholder="₹0.00" />
+                        <label className="input-label">Amount (₹)</label>
+                        <input name="amount" required type="text" className="premium-input" placeholder="0.00" />
                       </div>
                       <div className="input-container">
                         <label className="input-label">Date</label>
                         <div style={{ position: 'relative' }}>
                           <Calendar size={16} style={{ position: 'absolute', left: 12, top: 16, color: '#464555' }} />
-                          <input type="text" className="premium-input" style={{ paddingLeft: 40 }} placeholder="DD/MM/YYYY" defaultValue="06/04/2026" />
+                          <input name="date" required type="text" className="premium-input" style={{ paddingLeft: 40 }} placeholder="DD/MM/YYYY" defaultValue={new Date().toLocaleDateString('en-GB')} />
                         </div>
                       </div>
                     </div>
-                  </>
+                    <div className="input-container">
+                      <label className="input-label">Category</label>
+                      <input name="category" list="category-options" required type="text" className="premium-input" placeholder="Select or type category..." />
+                      <datalist id="category-options">
+                        <option value="Food & Dining" />
+                        <option value="Housing" />
+                        <option value="Transportation" />
+                        <option value="Technology" />
+                        <option value="Shopping" />
+                        <option value="Entertainment" />
+                        <option value="Miscellaneous" />
+                      </datalist>
+                    </div>
+                    <div className="modal-footer" style={{ marginTop: '2rem', margin: '0 -1.5rem -1.5rem', padding: '1.5rem' }}>
+                      <button type="button" className="btn-ghost" onClick={closeModal}>Cancel</button>
+                      <button type="submit" className="btn-primary">Save Transaction</button>
+                    </div>
+                  </form>
                 )}
 
                 {modalType === 'cards' && (
@@ -475,12 +709,16 @@ function App() {
                 )}
               </div>
 
-              <div className="modal-footer">
-                <button className="btn-ghost" onClick={closeModal}>Cancel</button>
-                <button className="btn-primary" onClick={closeModal}>
-                  {modalType === 'send' && 'Send Money'}{modalType === 'add' && 'Save Transaction'}{modalType === 'cards' && 'Card Settings'}{modalType === 'plan' && 'Adjust Goals'}
-                </button>
-              </div>
+              {modalType !== 'add' && (
+                <div className="modal-footer">
+                  <button className="btn-ghost" onClick={closeModal}>Cancel</button>
+                  <button className="btn-primary" onClick={closeModal}>
+                    {modalType === 'send' && 'Send Money'}
+                    {modalType === 'cards' && 'Card Settings'}
+                    {modalType === 'plan' && 'Adjust Goals'}
+                  </button>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
