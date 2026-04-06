@@ -4,6 +4,21 @@
 
 ---
 
+## 📸 Project Screenshots
+
+<div align="center">
+  <h3>🏠 Main Dashboard</h3>
+  <img src="./src/assets/Dashboard.png" alt="Financial Atelier Dashboard" width="100%" style="border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+  <br><br>
+  <h3>📊 Insights & Analytics</h3>
+  <img src="./src/assets/Insight.png" alt="Financial Atelier Insights" width="100%" style="border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+  <br><br>
+  <h3>💳 Transaction Ledger</h3>
+  <img src="./src/assets/Transaction.png" alt="Financial Atelier Transactions" width="100%" style="border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);">
+</div>
+
+---
+
 ## 🚀 Key Features
 
 ### 1. **Unified Wealth Portfolio**

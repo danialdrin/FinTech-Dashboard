@@ -189,10 +189,10 @@ const TransactionsView = () => (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="transaction-list">
         {/* Header Row */}
-        <div className="txn-item" style={{ 
-          background: 'var(--surface-container-low)', 
-          padding: '1rem var(--spacing-6)', 
-          cursor: 'default', 
+        <div className="txn-item" style={{
+          background: 'var(--surface-container-low)',
+          padding: '1rem var(--spacing-6)',
+          cursor: 'default',
           borderRadius: 0,
           borderBottom: '1px solid var(--surface-container-high)',
           display: 'flex',
@@ -204,13 +204,13 @@ const TransactionsView = () => (
           <div style={{ width: 120, textAlign: 'center', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Status</div>
           <div style={{ width: 100, textAlign: 'right', fontWeight: 700, fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--outline)' }}>Amount</div>
         </div>
-        
+
         {/* Data Rows */}
         {allTransactions.map((txn) => (
-          <div key={txn.id} className="txn-item" style={{ 
-            padding: '1.25rem var(--spacing-6)', 
-            borderBottom: '1px solid var(--surface-container)', 
-            borderRadius: 0, 
+          <div key={txn.id} className="txn-item" style={{
+            padding: '1.25rem var(--spacing-6)',
+            borderBottom: '1px solid var(--surface-container)',
+            borderRadius: 0,
             margin: 0,
             display: 'flex',
             alignItems: 'center'
@@ -291,7 +291,7 @@ const InsightsView = () => (
       <div className="insight-label">Wealth Forecast</div>
       <div className="insight-value">₹2.4M Goal</div>
       <p className="insight-desc">
-        At your current velocity, you are on track to exceed your annual preservation goal by **12.4%**. 
+        At your current velocity, you are on track to exceed your annual preservation goal by **12.4%**.
         Consider shifting **₹15,000/mo** into higher-yield index portfolios.
       </p>
     </div>
@@ -302,7 +302,7 @@ const InsightsView = () => (
 
 function App() {
   const [activeTab, setActiveTab] = useState('Dashboard');
-  const [modalType, setModalType] = useState(null); 
+  const [modalType, setModalType] = useState(null);
   const [selectedContact, setSelectedContact] = useState(null);
 
   const closeModal = () => {
@@ -373,7 +373,7 @@ function App() {
       <AnimatePresence>
         {modalType && (
           <div className="modal-backdrop" onClick={closeModal}>
-            <motion.div 
+            <motion.div
               className="modal-content"
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
