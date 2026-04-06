@@ -9,6 +9,7 @@
 | Component | Technology | Description |
 | :--- | :--- | :--- |
 | **Core Framework** | React (Vite) | High-performance, component-based frontend. |
+| **State Management** | Redux Toolkit | Centralized state for transactions, roles, and notifications. |
 | **Styling** | Vanilla CSS3 | Custom design system using CSS Variables for tokens. |
 | **Motion** | Framer Motion | Fluid layouts, modal transitions, and staggered entry effects. |
 | **Data Viz** | Recharts | Context-rich Area, Pie, and Bar charts for financial flow. |
@@ -54,9 +55,18 @@ The **Transactions Ledger** uses a "Locked Center" column logic:
 ### 4. Interactive Command Suite
 Four high-fidelity modals triggered by the Quick Actions panel:
 - **Quick Transfer**: Modal with contact selection for peer-to-peer sending.
-- **Add Transaction**: Detailed form with icon-based input fields.
+- **Add Transaction**: Detailed form acting as a combobox (`datalist`) for Category, pushing payloads to Redux.
 - **Card Manager**: Glassmorphic digital card preview with management toggles.
 - **Goal Planner**: Progress bars tracking high-value preservation goals.
+
+### 5. Advanced Notification System
+- **Real-Time Toasts**: Popups anchored uniquely under the navigation bar trigger automatically upon payload processing.
+- **Persistent History Drawer**: All notifications persist and can be recalled inside an explicit animated dropdown.
+- **Unread Badge & Motion mechanics**: An unread numeric badge tracks active unseen logs, triggering a custom CSS `@keyframes shake` upon payload genesis.
+
+### 6. Role-Based Access Control
+- **Login View**: Simulated Gateway dictating read-only (Viewer) vs Write-access (Admin) privileges.
+- **Dynamic Structural Rendering**: The grid layout and Add actions auto-adapt to fit the permitted space and authorization of the user.
 
 ---
 
@@ -73,6 +83,6 @@ document.md         # Full project documentation
 ---
 
 ## 📈 Future Scalability
-- **State Management**: Migration to Redux/Zustand for global transaction history.
+- **Persistence**: Connecting `redux-persist` to save the active notification and transaction store over hard-refreshes.
 - **API Integration**: Ready for REST/GraphQL hook-ins for real-time banking data.
 - **Dark Mode**: CSS Variables are set up for easy `prefers-color-scheme` implementation.
